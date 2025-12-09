@@ -1,18 +1,67 @@
 from tkinter import *
-from tkinter import messagebox,ttk
+from tkinter import messagebox, ttk
 import serial
 import serial.tools.list_ports
 import time
 import datetime
 import requests
 import struct
-from tkinter import *
 import pyautogui as py
 import pandas as pd
 import traceback
 from ERROR import *
+
 file_position = "click_position.csv"
 click_pos = pd.read_csv(file_position, index_col=0)
+
+# Global variable for meter_ser
+meter_ser = None
+
+def select_com_port():
+    ports = list(serial.tools.list_ports.comports())
+    port_list = [port.device for port in ports]
+
+    def connect():
+        global meter_ser
+        sel_port = cb_port.get()
+        if not sel_port:
+            messagebox.showerror("Lỗi", "Vui lòng chọn cổng COM!")
+            return
+        try:
+            meter_ser = serial.Serial(
+                port=sel_port,
+                baudrate=9600,
+                timeout=1,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+                xonxoff=True
+            )
+            meter_ser.setDTR(True)
+            meter_ser.setRTS(True)
+            meter_ser.isOpen()
+            com_win.destroy()
+            com_win.quit()
+        except Exception as e:
+            Systemp_log(traceback.format_exc()).append_new_line()
+            messagebox.showerror("Lỗi", f"Không thể mở COM {sel_port}.\n{e}")
+
+    com_win = Toplevel(wk)
+    com_win.title("Chọn COM Port")
+    com_win.geometry("250x120")
+    com_win.grab_set()
+    com_win.resizable(False, False)
+
+    Label(com_win, text="Chọn cổng COM:", font=('', 12)).pack(pady=(10, 5))
+
+    cb_port = ttk.Combobox(com_win, values=port_list, state="readonly", font=('', 12))
+    cb_port.pack(pady=5)
+    if port_list:
+        cb_port.current(0)
+    Button(com_win, text="Kết nối", command=connect, width=15, font=('', 11)).pack(pady=(8, 5))
+
+    com_win.mainloop()
+
 def calibPos():  # chỉnh sửa vị trí click
     def savePos():  # lưu vị trí sau khi chỉnh sửa
         try:
@@ -52,36 +101,33 @@ def calibPos():  # chỉnh sửa vị trí click
     except:
         Systemp_log(traceback.format_exc()).append_new_line()
 
-meter_ser = serial.Serial(
-            port='COM3',
-            baudrate=9600,
-            timeout=1,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            bytesize=serial.EIGHTBITS,
 
-            xonxoff=True
-        )
-meter_ser.setDTR(True)
-meter_ser.setRTS(True)
-meter_ser.isOpen()
-resulti=""
-count=0
+resulti = ""
+count = 0
 time1 = datetime.datetime.now()
+
 def again():
-    bytesToRead = meter_ser.inWaiting()
-    data = meter_ser.read(bytesToRead)
-    b = data
-    if len(b)>0:
-        print(data)
-        py.doubleclick(int(click_pos.loc['Text', 'X']), int(click_pos.loc['Text', 'Y']))
-        time.sleep(1)
-        py.doubleclick(int(click_pos.loc['Apply', 'X']), int(click_pos.loc['Apply', 'Y']))
-        time.sleep(1)
-        py.write(data.decode('utf-8').strip())
-        time.sleep(1)
-        py.press('enter')
-    wk.after(1000,again)
+    global meter_ser
+    if meter_ser is None or not meter_ser.isOpen():
+        wk.after(1000, again)
+        return
+    try:
+        bytesToRead = meter_ser.inWaiting()
+        data = meter_ser.read(bytesToRead)
+        b = data
+        if len(b) > 0:
+            print(data)
+            py.doubleClick(int(click_pos.loc['Text', 'X']), int(click_pos.loc['Text', 'Y']))
+            time.sleep(1)
+            py.doubleClick(int(click_pos.loc['Apply', 'X']), int(click_pos.loc['Apply', 'Y']))
+            time.sleep(1)
+            py.write(data.decode('utf-8').strip())
+            time.sleep(1)
+            py.press('enter')
+    except Exception:
+        Systemp_log(traceback.format_exc()).append_new_line()
+    wk.after(1000, again)
+
 wk = Tk()
 main_menu = Menu(wk)
 wk.configure(menu=main_menu)
@@ -89,6 +135,10 @@ edit_menu = Menu(main_menu, tearoff=0)
 connect_menu = Menu(main_menu, tearoff=0)
 main_menu.add_cascade(label="Chỉnh Sửa", menu=edit_menu)
 edit_menu.add_command(label="Vị Trí Nhấn", command=calibPos)
+main_menu.add_cascade(label="Kết Nối", menu=connect_menu)
+connect_menu.add_command(label="Chọn COM", command=select_com_port)
+
+# Yêu cầu chọn COM trước khi bắt đầu
+select_com_port()
 again()
 wk.mainloop()
-    
