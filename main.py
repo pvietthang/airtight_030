@@ -118,12 +118,12 @@ def again():
         if len(b) > 0:
             print(data)
             py.doubleClick(int(click_pos.loc['Text', 'X']), int(click_pos.loc['Text', 'Y']))
-            time.sleep(1)
-            py.doubleClick(int(click_pos.loc['Apply', 'X']), int(click_pos.loc['Apply', 'Y']))
-            time.sleep(1)
+            time.sleep(0.1)
+            py.press('tab',presses=3)
+            time.sleep(0.1)
             py.write(data.decode('utf-8').strip())
-            time.sleep(1)
-            py.press('enter')
+            time.sleep(0.1)
+            py.press('enter',presses=2)
     except Exception:
         Systemp_log(traceback.format_exc()).append_new_line()
     wk.after(1000, again)
